@@ -5,38 +5,28 @@ const DatastoreNEdb = require('nedb');
 //mongoDB connection section
 const { MongoClient } = require('mongodb');
 const uriM = "mongodb://localhost:27017";
-const clientM = new MongoClient(uriM);
+let clientM = new MongoClient(uriM);
+let dbM = clientM.db("AdvisorHelper");
+let clientMstartTime = Math.floor(Date.now() / 1000); //get start time in seconds
 
-async function run(){
+async function run(collectionName, queryMpassed, optionsMpassed){
     try {
-        const dbM = clientM.db("AdvisorHelper");
-        const students = dbM.collection("Student");
-        const queryM = {};
-        const optionsM = {};
-        const cursorMarray = await students.find(queryM, optionsM).toArray();
+        const students = dbM.collection(collectionName);
+        const cursorMarray = await students.find(queryMpassed, optionsMpassed).toArray();
         if ((await cursorMarray.length) === 0) {
-            console.log("No documents found!");
+            console.log("No documents found!", queryMpassed);
         }
         return cursorMarray;
     } finally {
-        await clientM.close();
+        let currentTime = Math.floor(Date.now() / 1000); //get current time in seconds 129600 = 36 hours
+        if (currentTime > (clientMstartTime + 129600)){
+            await clientM.close();
+            clientM = new MongoClient(uriM);
+            dbM = clientM.db("AdvisorHelper");
+            clientMstartTime = Math.floor(Date.now() / 1000); //get start time in seconds
+        }
     }
 }
-
-
-/*
-const mongoDBname = 'AdvisorHelper'; //name of database
-let foundDocuments;
-
-async function mongoDBconnect(){
-    await mongoDBclient.connect(); //connect to server
-    const mongoDBobject = mongoDBclient.db(mongoDBname).collection('Student'); //same as db = client.db(dbName) in docs
-    //const studentCollection = mongoDBobject.collection('Student');
-    foundDocuments = await mongoDBobject.find({});
-}
-
-mongoDBconnect();
- */
 
 // end mongoDB connection section
 
@@ -132,7 +122,26 @@ app.get('/nedb', (request, response) => {
     });
 });
 
-app.get('/students', async (req, res) => {
-    let fDocs = await run(); // .catch(console.dir);
+app.get('/student', async (req, res) => {
+    let fDocs;
+    if (req.query.qValue){
+        let theField = req.query.qField;
+        let theValue = req.query.qValue;
+        fDocs = await run('Student', { [theField] : theValue }, {}); // the [brackets] allow it to be a key not an array
+    } else {
+        fDocs = await run('Student', {}, {});
+    }
+    res.send(fDocs);
+});
+
+app.get('/faculty', async (req, res) => {
+    let fDocs;
+    if (req.query.qValue){
+        let theField = req.query.qField;
+        let theValue = req.query.qValue;
+        fDocs = await run('Faculty', { [theField] : theValue }, {}); // the [brackets] allow it to be a key not an array
+    } else {
+        fDocs = await run('Faculty', {}, {});
+    }
     res.send(fDocs);
 });
